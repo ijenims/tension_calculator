@@ -5,6 +5,8 @@ import pandas as pd
 
 from domain.models.cable_record import CableRecord
 from infrastructure.repositories.cable_repository import CableRepository
+from domain.physics.design_rigidity_calculator import DesignRigidityCalculator
+from domain.physics.xi_calculator import XiCalculator
 
 
 class ExcelCableRepository(CableRepository):
@@ -31,6 +33,9 @@ class ExcelCableRepository(CableRepository):
                 sheet_name=self._sheet_name,
                 engine="openpyxl",
             )
+
+            if isinstance(df, dict):
+                df = list(df.values())[0]
 
             df.columns = [str(col).strip() for col in df.columns]
 
@@ -98,9 +103,9 @@ class ExcelCableRepository(CableRepository):
         df = self._load()
 
         filtered = df[
-            (df["施設名"] == facility_name)
-            & (df["ケーブルNo."] == cable_no)
-            & (df["枝番"] == branch_no)
+            (df["施設名"].astype(str) == str(facility_name))
+            & (df["ケーブルNo."].astype(str) == str(cable_no))
+            & (df["枝番"].astype(str) == str(branch_no))
         ]
 
         if len(filtered) == 0:
@@ -119,11 +124,23 @@ class ExcelCableRepository(CableRepository):
             else None
         )
 
+        if design_rigidity is None:
+            design_rigidity = DesignRigidityCalculator.calculate_from_unit_weight(
+                unit_weight_kg_per_m=float(row["単位重量"])
+            )
+
         xi = (
             float(row["ξ"])
             if "ξ" in row and pd.notna(row["ξ"])
             else None
         )
+
+        if xi is None:
+            xi = XiCalculator.calculate(
+                cable_length_m=float(row["ケーブル長"]),
+                tension_kN=float(row["設計張力"]),
+                rigidity_Nm2=design_rigidity,
+            )
 
         return CableRecord(
             facility_name=str(row["施設名"]),

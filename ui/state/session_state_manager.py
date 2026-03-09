@@ -139,3 +139,21 @@ def clear_surface_data() -> None:
     st.session_state["surface_K"] = None
     st.session_state["surface_B"] = None
     st.session_state["surface_Z"] = None
+
+
+def reset_case_state(current_key: tuple) -> None:
+    """
+    選択中ケーブルが変わったときに、ケース依存の session_state を初期化する。
+    """
+    previous_key = st.session_state.get("current_cable_key")
+
+    if previous_key != current_key:
+        st.session_state["current_cable_key"] = current_key
+        st.session_state["measured_frequencies_hz"] = []
+        st.session_state["use_mask"] = []
+        st.session_state["theoretical_frequencies_hz"] = []
+        st.session_state["last_result"] = None
+        st.session_state["surface_K"] = None
+        st.session_state["surface_B"] = None
+        st.session_state["surface_Z"] = None
+        

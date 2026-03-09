@@ -2,12 +2,13 @@ from typing import Optional
 
 import streamlit as st
 
-from config.defaults import APP_TITLE, MASTER_FILEPATH, RESULT_FILEPATH, RESULT_SHEET_NAME
+from config.defaults import APP_TITLE, MASTER_FILEPATH, RESULT_FILEPATH, RESULT_SHEET_NAME, MASTER_SHEET_NAME
 from domain.models.calculation_result import CalculationResult
 from infrastructure.repositories.excel_cable_repository import ExcelCableRepository
 from infrastructure.repositories.excel_result_repository import ExcelResultRepository
 from services.manual_frequency_service import ManualFrequencyService
 from services.optimization_service import OptimizationService
+from ui.components.spec_panel import render_spec_panel
 from ui.components.frequency_editor import FrequencyEditorState, render_frequency_editor
 from ui.components.result_panel import render_result_panel
 from ui.components.save_panel import render_save_panel
@@ -23,6 +24,7 @@ from ui.state.session_state_manager import (
     set_manual_parameters,
     set_selected_keys,
     set_surface_data,
+    reset_case_state,
 )
 from visualization.frequency_plot import create_frequency_plot
 from visualization.objective_surface_plot import create_objective_surface_plot
@@ -41,7 +43,10 @@ def main() -> None:
 
     initialize_session_state()
 
-    cable_repository = ExcelCableRepository(filepath=MASTER_FILEPATH)
+    cable_repository = ExcelCableRepository(
+        filepath=MASTER_FILEPATH,
+        sheet_name=MASTER_SHEET_NAME,
+        )
     result_repository = ExcelResultRepository(
         filepath=RESULT_FILEPATH,
         sheet_name=RESULT_SHEET_NAME,
@@ -56,6 +61,16 @@ def main() -> None:
         cable_numbers=_get_cable_numbers(cable_repository, facility_names),
         branch_numbers=_get_branch_numbers(cable_repository, facility_names),
     )
+
+    current_key = (
+        sidebar_state.facility_name,
+        sidebar_state.cable_no,
+        sidebar_state.branch_no,
+        sidebar_state.max_mode,
+    )
+
+
+    reset_case_state(current_key)
 
     set_selected_keys(
         facility_name=sidebar_state.facility_name,
@@ -79,6 +94,8 @@ def main() -> None:
         branch_no=sidebar_state.branch_no,          # type: ignore[arg-type]
         max_mode=sidebar_state.max_mode,
     )
+
+    render_spec_panel(cable)
 
     current_measured, current_use_mask, current_theoretical = _prepare_frequency_state(cable)
 

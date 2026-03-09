@@ -82,7 +82,5 @@ class DesignRigidityCalculator:
         Returns:
             補正後曲げ剛性 [N·m^2]
         """
-        if design_rigidity_Nm2 <= 0:
-            raise ValueError("design_rigidity_Nm2 must be positive.")
 
         return design_rigidity_Nm2 * beta

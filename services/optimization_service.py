@@ -236,11 +236,7 @@ class OptimizationService:
             max_mode=cable.max_mode,
         )
 
-        xi: float = XiCalculator.calculate(
-            cable_length_m=cable.cable_length_m,
-            tension_kN=tension_kN,
-            rigidity_Nm2=rigidity_Nm2,
-        )
+        xi: float | None = cable.xi
 
         return CalculationResult(
             k=k,
