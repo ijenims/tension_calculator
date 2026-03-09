@@ -115,6 +115,7 @@ def create_objective_surface_plot(
 
     fig.update_layout(
         title=title,
+        height=900,
         scene=dict(
             xaxis_title="k",
             yaxis_title="b",

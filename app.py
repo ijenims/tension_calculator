@@ -9,7 +9,7 @@ from infrastructure.repositories.excel_result_repository import ExcelResultRepos
 from services.manual_frequency_service import ManualFrequencyService
 from services.optimization_service import OptimizationService
 from ui.components.spec_panel import render_spec_panel
-from ui.components.frequency_editor import FrequencyEditorState, render_frequency_editor
+from ui.components.frequency_editor import render_frequency_editor
 from ui.components.result_panel import render_result_panel
 from ui.components.save_panel import render_save_panel
 from ui.components.sidebar import SidebarState, render_sidebar
@@ -99,22 +99,21 @@ def main() -> None:
 
     current_measured, current_use_mask, current_theoretical = _prepare_frequency_state(cable)
 
-    frequency_editor_state: FrequencyEditorState = render_frequency_editor(
-        measured_frequencies_hz=current_measured,
+    edited_measured_frequencies_hz, edited_use_mask = render_frequency_editor(
+        theoretical_freqs=current_theoretical,
+        measured_freqs=current_measured,
         use_mask=current_use_mask,
-        theoretical_frequencies_hz=current_theoretical,
-        max_mode=cable.max_mode,
     )
 
     set_frequency_state(
-        measured_frequencies_hz=frequency_editor_state.measured_frequencies_hz,
-        use_mask=frequency_editor_state.use_mask,
+        measured_frequencies_hz=edited_measured_frequencies_hz,
+        use_mask=edited_use_mask,
         theoretical_frequencies_hz=current_theoretical,
     )
 
     working_cable = _clone_cable_with_edited_frequencies(
         cable=cable,
-        measured_frequencies_hz=frequency_editor_state.measured_frequencies_hz,
+        measured_frequencies_hz=edited_measured_frequencies_hz,
     )
 
     result: Optional[CalculationResult] = get_last_result()
@@ -125,13 +124,13 @@ def main() -> None:
                 cable=working_cable,
                 k=sidebar_state.manual_k,
                 b=sidebar_state.manual_b,
-                use_mask=frequency_editor_state.use_mask,
+                use_mask=edited_use_mask,
                 condition=sidebar_state.search_condition,
             )
             set_last_result(result)
             set_frequency_state(
-                measured_frequencies_hz=frequency_editor_state.measured_frequencies_hz,
-                use_mask=frequency_editor_state.use_mask,
+                measured_frequencies_hz=edited_measured_frequencies_hz,
+                use_mask=edited_use_mask,
                 theoretical_frequencies_hz=result.theoretical_frequencies_hz,
             )
             clear_surface_data()
@@ -143,22 +142,22 @@ def main() -> None:
             if sidebar_state.search_condition.method == "grid":
                 result, K, B, Z = optimization_service.optimize_with_surface(
                     cable=working_cable,
-                    use_mask=frequency_editor_state.use_mask,
+                    use_mask=edited_use_mask,
                     condition=sidebar_state.search_condition,
                 )
                 set_surface_data(K=K, B=B, Z=Z)
             else:
                 result = optimization_service.optimize(
                     cable=working_cable,
-                    use_mask=frequency_editor_state.use_mask,
+                    use_mask=edited_use_mask,
                     condition=sidebar_state.search_condition,
                 )
                 clear_surface_data()
 
             set_last_result(result)
             set_frequency_state(
-                measured_frequencies_hz=frequency_editor_state.measured_frequencies_hz,
-                use_mask=frequency_editor_state.use_mask,
+                measured_frequencies_hz=edited_measured_frequencies_hz,
+                use_mask=edited_use_mask,
                 theoretical_frequencies_hz=result.theoretical_frequencies_hz,
             )
         except Exception as exc:

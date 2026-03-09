@@ -1,173 +1,72 @@
-from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional, Tuple
 
-import pandas as pd
 import streamlit as st
 
 
-@dataclass
-class FrequencyEditorState:
-    """
-    周波数編集テーブルの状態を保持するデータクラス。
-    """
-
-    measured_frequencies_hz: list[Optional[float]]
-    use_mask: list[bool]
-
-
 def render_frequency_editor(
-    measured_frequencies_hz: list[Optional[float]],
-    use_mask: list[bool],
-    theoretical_frequencies_hz: list[float],
-    max_mode: int,
-) -> FrequencyEditorState:
+    theoretical_freqs: List[float],
+    measured_freqs: List[Optional[float]],
+    use_mask: List[bool],
+) -> Tuple[List[Optional[float]], List[bool]]:
     """
-    周波数編集テーブルを描画し、編集後の実測周波数列と use_mask を返す。
+    周波数編集UI（横配置）
 
-    表の構成は以下。
-        行: 実測周波数 / 使用 / 理論周波数
-        列: 1次, 2次, ..., max_mode次
-
-    Args:
-        measured_frequencies_hz:
-            実測周波数列 [Hz]。未検出は None を許容する。
-        use_mask:
-            各モードの使用フラグ列。
-        theoretical_frequencies_hz:
-            理論周波数列 [Hz]。
-        max_mode:
-            最大モード次数。
-
-    Returns:
-        FrequencyEditorState:
-            編集後の状態。
-
-    Raises:
-        ValueError:
-            入力列長が max_mode と一致しない場合。
+    上から
+    1. モード見出し
+    2. 理論周波数（表示のみ）
+    3. 実測周波数（編集可）
+    4. 使用チェックボックス
     """
-    if len(measured_frequencies_hz) != max_mode:
-        raise ValueError("measured_frequencies_hz length must match max_mode.")
-    if len(use_mask) != max_mode:
-        raise ValueError("use_mask length must match max_mode.")
-    if len(theoretical_frequencies_hz) != max_mode:
-        raise ValueError("theoretical_frequencies_hz length must match max_mode.")
+    max_mode: int = len(theoretical_freqs)
 
     st.subheader("周波数編集")
 
-    editor_df: pd.DataFrame = build_frequency_editor_dataframe(
-        measured_frequencies_hz=measured_frequencies_hz,
-        use_mask=use_mask,
-        theoretical_frequencies_hz=theoretical_frequencies_hz,
-        max_mode=max_mode,
-    )
+    # --- ヘッダ行 ---
+    header_cols = st.columns(max_mode + 1)
+    header_cols[0].markdown("")
+    for i in range(max_mode):
+        header_cols[i + 1].markdown(f"**{i + 1}次**")
 
-    edited_df: pd.DataFrame = st.data_editor(
-        editor_df,
-        use_container_width=True,
-        hide_index=False,
-        disabled=["理論周波数 [Hz]"],
-        key="frequency_editor_table",
-    )
+    # --- 理論周波数行 ---
+    theory_cols = st.columns(max_mode + 1)
+    theory_cols[0].markdown("**理論周波数 [Hz]**")
+    for i, f in enumerate(theoretical_freqs):
+        theory_cols[i + 1].write(f"{f:.4f}")
 
-    edited_measured_frequencies_hz, edited_use_mask = parse_frequency_editor_dataframe(
-        df=edited_df,
-        max_mode=max_mode,
-    )
+    # --- 実測周波数行 ---
+    measured_cols = st.columns(max_mode + 1)
+    measured_cols[0].markdown("**実測周波数 [Hz]**")
 
-    return FrequencyEditorState(
-        measured_frequencies_hz=edited_measured_frequencies_hz,
-        use_mask=edited_use_mask,
-    )
+    new_measured: List[Optional[float]] = []
+    for i in range(max_mode):
+        default_value: str = "" if measured_freqs[i] is None else f"{measured_freqs[i]}"
+        val: str = measured_cols[i + 1].text_input(
+            label=f"{i + 1}次 実測周波数",
+            value=default_value,
+            label_visibility="collapsed",
+            key=f"obs_freq_{i}",
+        )
 
-
-def build_frequency_editor_dataframe(
-    measured_frequencies_hz: list[Optional[float]],
-    use_mask: list[bool],
-    theoretical_frequencies_hz: list[float],
-    max_mode: int,
-) -> pd.DataFrame:
-    """
-    周波数編集用 DataFrame を生成する。
-
-    Args:
-        measured_frequencies_hz:
-            実測周波数列 [Hz]。
-        use_mask:
-            使用フラグ列。
-        theoretical_frequencies_hz:
-            理論周波数列 [Hz]。
-        max_mode:
-            最大モード次数。
-
-    Returns:
-        pd.DataFrame:
-            data_editor に渡すための横持ち DataFrame。
-    """
-    columns: list[str] = [f"{mode}次" for mode in range(1, max_mode + 1)]
-
-    data = {
-        column: [
-            measured_frequencies_hz[index],
-            bool(use_mask[index]),
-            float(theoretical_frequencies_hz[index]),
-        ]
-        for index, column in enumerate(columns)
-    }
-
-    df = pd.DataFrame(
-        data=data,
-        index=["実測周波数 [Hz]", "使用", "理論周波数 [Hz]"],
-    )
-
-    return df
-
-
-def parse_frequency_editor_dataframe(
-    df: pd.DataFrame,
-    max_mode: int,
-) -> tuple[list[Optional[float]], list[bool]]:
-    """
-    編集後 DataFrame から実測周波数列と use_mask を取り出す。
-
-    Args:
-        df:
-            data_editor の編集後 DataFrame。
-        max_mode:
-            最大モード次数。
-
-    Returns:
-        tuple[list[Optional[float]], list[bool]]:
-            - 編集後の実測周波数列
-            - 編集後の use_mask
-
-    Raises:
-        ValueError:
-            必要な行・列が不足している場合。
-    """
-    expected_index: list[str] = ["実測周波数 [Hz]", "使用", "理論周波数 [Hz]"]
-    expected_columns: list[str] = [f"{mode}次" for mode in range(1, max_mode + 1)]
-
-    for row_name in expected_index:
-        if row_name not in df.index:
-            raise ValueError(f"Missing required row: {row_name}")
-
-    for column_name in expected_columns:
-        if column_name not in df.columns:
-            raise ValueError(f"Missing required column: {column_name}")
-
-    measured_frequencies_hz: list[Optional[float]] = []
-    use_mask: list[bool] = []
-
-    for column_name in expected_columns:
-        measured_value = df.at["実測周波数 [Hz]", column_name]
-        use_value = df.at["使用", column_name]
-
-        if pd.isna(measured_value) or measured_value == "":
-            measured_frequencies_hz.append(None)
-            use_mask.append(False)
+        if val.strip() == "":
+            new_measured.append(None)
         else:
-            measured_frequencies_hz.append(float(measured_value))
-            use_mask.append(bool(use_value))
+            try:
+                new_measured.append(float(val))
+            except ValueError:
+                new_measured.append(None)
 
-    return measured_frequencies_hz, use_mask
+    # --- 使用行 ---
+    use_cols = st.columns(max_mode + 1)
+    use_cols[0].markdown("**使用**")
+
+    new_mask: List[bool] = []
+    for i in range(max_mode):
+        checked: bool = use_cols[i + 1].checkbox(
+            label=f"{i + 1}次 使用",
+            value=use_mask[i],
+            label_visibility="collapsed",
+            key=f"use_freq_{i}",
+        )
+        new_mask.append(checked)
+
+    return new_measured, new_mask
