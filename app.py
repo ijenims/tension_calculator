@@ -4,6 +4,7 @@ import streamlit as st
 
 from config.defaults import APP_TITLE, MASTER_FILEPATH, RESULT_FILEPATH, RESULT_SHEET_NAME, MASTER_SHEET_NAME
 from domain.models.calculation_result import CalculationResult
+from domain.physics.frequency_formula import FrequencyFormula
 from infrastructure.repositories.excel_cable_repository import ExcelCableRepository
 from infrastructure.repositories.excel_result_repository import ExcelResultRepository
 from services.manual_frequency_service import ManualFrequencyService
@@ -24,7 +25,6 @@ from ui.state.session_state_manager import (
     set_manual_parameters,
     set_selected_keys,
     set_surface_data,
-    reset_case_state,
 )
 from visualization.frequency_plot import create_frequency_plot
 from visualization.objective_surface_plot import create_objective_surface_plot
@@ -69,14 +69,12 @@ def main() -> None:
         sidebar_state.max_mode,
     )
 
-
-    reset_case_state(current_key)
-
     set_selected_keys(
         facility_name=sidebar_state.facility_name,
         cable_no=sidebar_state.cable_no,
         branch_no=sidebar_state.branch_no,
     )
+
     set_manual_parameters(
         manual_k=sidebar_state.manual_k,
         manual_b=sidebar_state.manual_b,
@@ -95,21 +93,52 @@ def main() -> None:
         max_mode=sidebar_state.max_mode,
     )
 
+    current_key = (
+        sidebar_state.facility_name,
+        sidebar_state.cable_no,
+        sidebar_state.branch_no,
+        sidebar_state.max_mode,
+    )
+
+    previous_key = st.session_state.get("current_cable_key")
+    is_new_case = previous_key != current_key
+
+    if is_new_case:
+        st.session_state["current_cable_key"] = current_key
+
+        initial_measured = cable.measured_frequencies_hz
+        initial_use_mask = [freq is not None for freq in initial_measured]
+
+        design_rigidity = cable.design_rigidity_Nm2
+        if design_rigidity is None:
+            raise ValueError("design_rigidity_Nm2 is required.")
+
+        initial_theoretical = FrequencyFormula.calculate(
+            tension_kN=cable.design_tension_kN * 1.0,
+            rigidity_Nm2=design_rigidity * 0.5,
+            unit_weight_kg_per_m=cable.unit_weight_kg_per_m,
+            cable_length_m=cable.cable_length_m,
+            max_mode=cable.max_mode,
+        )
+
+        st.session_state["editor_measured"] = initial_measured
+        st.session_state["editor_use_mask"] = initial_use_mask
+        st.session_state["editor_theoretical"] = initial_theoretical
+
+        set_last_result(None)
+        clear_surface_data()
+
     render_spec_panel(cable)
 
-    current_measured, current_use_mask, current_theoretical = _prepare_frequency_state(cable)
-
     edited_measured_frequencies_hz, edited_use_mask = render_frequency_editor(
-        theoretical_freqs=current_theoretical,
-        measured_freqs=current_measured,
-        use_mask=current_use_mask,
+        case_key=str(current_key),
+        theoretical_freqs=st.session_state["editor_theoretical"],
+        measured_freqs=st.session_state["editor_measured"],
+        use_mask=st.session_state["editor_use_mask"],
     )
 
-    set_frequency_state(
-        measured_frequencies_hz=edited_measured_frequencies_hz,
-        use_mask=edited_use_mask,
-        theoretical_frequencies_hz=current_theoretical,
-    )
+    st.session_state["editor_measured"] = edited_measured_frequencies_hz
+    st.session_state["editor_use_mask"] = edited_use_mask
 
     working_cable = _clone_cable_with_edited_frequencies(
         cable=cable,
@@ -128,11 +157,7 @@ def main() -> None:
                 condition=sidebar_state.search_condition,
             )
             set_last_result(result)
-            set_frequency_state(
-                measured_frequencies_hz=edited_measured_frequencies_hz,
-                use_mask=edited_use_mask,
-                theoretical_frequencies_hz=result.theoretical_frequencies_hz,
-            )
+            st.session_state["editor_theoretical"] = result.theoretical_frequencies_hz
             clear_surface_data()
         except Exception as exc:
             st.error(f"理論周波数更新でエラー: {exc}")
@@ -155,13 +180,11 @@ def main() -> None:
                 clear_surface_data()
 
             set_last_result(result)
-            set_frequency_state(
-                measured_frequencies_hz=edited_measured_frequencies_hz,
-                use_mask=edited_use_mask,
-                theoretical_frequencies_hz=result.theoretical_frequencies_hz,
-            )
+            st.session_state["editor_theoretical"] = result.theoretical_frequencies_hz
         except Exception as exc:
             st.error(f"最適化実行でエラー: {exc}")
+
+    st.divider()
 
     result = get_last_result()
     render_result_panel(result)
@@ -172,15 +195,24 @@ def main() -> None:
                 measured_frequencies_hz=result.measured_frequencies_hz,
                 theoretical_frequencies_hz=result.theoretical_frequencies_hz,
                 use_mask=result.use_mask,
-            )
-            st.plotly_chart(freq_fig, use_container_width=True)
+            )            
 
             residual_fig = create_residual_plot(
                 measured_frequencies_hz=result.measured_frequencies_hz,
                 theoretical_frequencies_hz=result.theoretical_frequencies_hz,
                 use_mask=result.use_mask,
             )
-            st.plotly_chart(residual_fig, use_container_width=True)
+
+            st.divider()
+
+            col_left, col_right = st.columns(2)
+            with col_left:
+                st.plotly_chart(freq_fig, use_container_width=True)
+            with col_right:
+                st.plotly_chart(residual_fig, use_container_width=True)
+
+            st.divider()
+                
         except Exception as exc:
             st.error(f"グラフ描画でエラー: {exc}")
 
@@ -274,28 +306,6 @@ def _is_selection_complete(sidebar_state: SidebarState) -> bool:
             sidebar_state.branch_no,
         ]
     )
-
-
-def _prepare_frequency_state(cable) -> tuple[list[float | None], list[bool], list[float]]:
-    """
-    editor 初期表示用の周波数状態を組み立てる。
-    """
-    session_measured, session_use_mask, session_theoretical = get_frequency_state()
-
-    same_length = (
-        len(session_measured) == cable.max_mode
-        and len(session_use_mask) == cable.max_mode
-        and len(session_theoretical) == cable.max_mode
-    )
-
-    if same_length:
-        return session_measured, session_use_mask, session_theoretical
-
-    measured = cable.measured_frequencies_hz
-    use_mask = [freq is not None for freq in measured]
-    theoretical = [0.0] * cable.max_mode
-
-    return measured, use_mask, theoretical
 
 
 def _clone_cable_with_edited_frequencies(

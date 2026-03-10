@@ -4,6 +4,7 @@ import streamlit as st
 
 
 def render_frequency_editor(
+    case_key: str,
     theoretical_freqs: List[float],
     measured_freqs: List[Optional[float]],
     use_mask: List[bool],
@@ -44,7 +45,7 @@ def render_frequency_editor(
             label=f"{i + 1}次 実測周波数",
             value=default_value,
             label_visibility="collapsed",
-            key=f"obs_freq_{i}",
+            key=f"obs_freq_{case_key}_{i}",
         )
 
         if val.strip() == "":
@@ -65,7 +66,7 @@ def render_frequency_editor(
             label=f"{i + 1}次 使用",
             value=use_mask[i],
             label_visibility="collapsed",
-            key=f"use_freq_{i}",
+            key=f"use_freq_{case_key}_{i}",
         )
         new_mask.append(checked)
 

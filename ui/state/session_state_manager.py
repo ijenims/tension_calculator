@@ -19,9 +19,11 @@ def initialize_session_state() -> None:
         "max_mode": DEFAULT_MAX_MODE,
         "manual_k": float(DEFAULT_MANUAL_K),
         "manual_b": float(DEFAULT_MANUAL_B),
-        "measured_frequencies_hz": [],
-        "use_mask": [],
-        "theoretical_frequencies_hz": [],
+
+        "editor_measured": [],
+        "editor_use_mask": [],
+        "editor_theoretical": [],
+
         "last_result": None,
         "surface_K": None,
         "surface_B": None,

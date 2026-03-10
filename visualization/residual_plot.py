@@ -109,6 +109,7 @@ def create_residual_plot(
         xaxis_title="モード次数",
         yaxis_title="残差 [Hz] (実測 - 理論)",
         xaxis=dict(dtick=1),
+        yaxis=dict(range=[-1, 1]),
     )
 
     return fig

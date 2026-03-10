@@ -97,10 +97,15 @@ def create_objective_surface_plot(
         x=K,
         y=B,
         z=Z_plot,
+        opacity=0.8,    # サーフェスの透明度
         contours=dict(
             x=dict(show=show_contours, project_x=True),
             y=dict(show=show_contours, project_y=True),
-            z=dict(show=show_contours, usecolormap=True, project_z=True),
+            z=dict(
+                show=show_contours, 
+                usecolormap=True, 
+                highlightcolor="lime",    # 等高線の色
+                project_z=True),
         ),
         hovertemplate=(
             "k=%{x:.4f}<br>"
@@ -115,11 +120,12 @@ def create_objective_surface_plot(
 
     fig.update_layout(
         title=title,
-        height=900,
+        height=900,    # グラフの高さ
         scene=dict(
             xaxis_title="k",
             yaxis_title="b",
             zaxis_title="MSE",
+            # zaxis=dict(type="log"),  # z軸を対数スケールにする
             aspectratio=dict(
                 x=aspect_ratio[0],
                 y=aspect_ratio[1],

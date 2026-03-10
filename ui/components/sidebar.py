@@ -100,21 +100,29 @@ def render_sidebar(
     st.sidebar.divider()
     st.sidebar.subheader("手動検証")
 
-    manual_k: float = st.sidebar.number_input(
-        label="k",
-        value=float(DEFAULT_MANUAL_K),
-        step=0.01,
-        format="%.4f",
+    col_k, col_b = st.sidebar.columns(2)
+
+    manual_k_str: str = col_k.text_input(
+        label="k：張力の係数",
+        value=f"{DEFAULT_MANUAL_K:.2f}",
         key="sidebar_manual_k",
     )
 
-    manual_b: float = st.sidebar.number_input(
-        label="b",
-        value=float(DEFAULT_MANUAL_B),
-        step=0.01,
-        format="%.4f",
+    manual_b_str: str = col_b.text_input(
+        label="b：EIの係数(β)",
+        value=f"{DEFAULT_MANUAL_B:.2f}",
         key="sidebar_manual_b",
     )
+
+    try:
+        manual_k: float = float(manual_k_str)
+    except ValueError:
+        manual_k = float(DEFAULT_MANUAL_K)
+
+    try:
+        manual_b: float = float(manual_b_str)
+    except ValueError:
+        manual_b = float(DEFAULT_MANUAL_B)
 
     execute_manual_update: bool = st.sidebar.button(
         label="理論周波数更新",
@@ -132,58 +140,74 @@ def render_sidebar(
         key="sidebar_method",
     )
 
-    k_min: float = st.sidebar.number_input(
+    col_k_min, col_k_max = st.sidebar.columns(2)
+    k_min_str: str = col_k_min.text_input(
         label="k_min",
-        value=float(DEFAULT_K_MIN),
-        step=0.01,
-        format="%.4f",
+        value=f"{DEFAULT_K_MIN:.1f}",
         key="sidebar_k_min",
     )
-
-    k_max: float = st.sidebar.number_input(
+    k_max_str: str = col_k_max.text_input(
         label="k_max",
-        value=float(DEFAULT_K_MAX),
-        step=0.01,
-        format="%.4f",
+        value=f"{DEFAULT_K_MAX:.1f}",
         key="sidebar_k_max",
     )
 
-    b_min: float = st.sidebar.number_input(
+    col_b_min, col_b_max = st.sidebar.columns(2)
+    b_min_str: str = col_b_min.text_input(
         label="b_min",
-        value=float(DEFAULT_B_MIN),
-        step=0.1,
-        format="%.4f",
+        value=f"{DEFAULT_B_MIN:.1f}",
         key="sidebar_b_min",
     )
-
-    b_max: float = st.sidebar.number_input(
+    b_max_str: str = col_b_max.text_input(
         label="b_max",
-        value=float(DEFAULT_B_MAX),
-        step=0.1,
-        format="%.4f",
+        value=f"{DEFAULT_B_MAX:.1f}",
         key="sidebar_b_max",
     )
 
     if method == "grid":
-        grid_step_k: float = st.sidebar.number_input(
+        col_step_k, col_step_b = st.sidebar.columns(2)
+        grid_step_k_str: str = col_step_k.text_input(
             label="grid_step_k",
-            min_value=0.0001,
-            value=float(DEFAULT_GRID_STEP_K),
-            step=0.01,
-            format="%.4f",
+            value=f"{DEFAULT_GRID_STEP_K:.3f}",
             key="sidebar_grid_step_k",
         )
-
-        grid_step_b: float = st.sidebar.number_input(
+        grid_step_b_str: str = col_step_b.text_input(
             label="grid_step_b",
-            min_value=0.0001,
-            value=float(DEFAULT_GRID_STEP_B),
-            step=0.1,
-            format="%.4f",
+            value=f"{DEFAULT_GRID_STEP_B:.3f}",
             key="sidebar_grid_step_b",
         )
     else:
+        grid_step_k_str = f"{DEFAULT_GRID_STEP_K:.3f}"
+        grid_step_b_str = f"{DEFAULT_GRID_STEP_B:.3f}"
+
+    try:
+        k_min: float = float(k_min_str)
+    except ValueError:
+        k_min = float(DEFAULT_K_MIN)
+
+    try:
+        k_max: float = float(k_max_str)
+    except ValueError:
+        k_max = float(DEFAULT_K_MAX)
+
+    try:
+        b_min: float = float(b_min_str)
+    except ValueError:
+        b_min = float(DEFAULT_B_MIN)
+
+    try:
+        b_max: float = float(b_max_str)
+    except ValueError:
+        b_max = float(DEFAULT_B_MAX)
+
+    try:
+        grid_step_k: float = float(grid_step_k_str)
+    except ValueError:
         grid_step_k = float(DEFAULT_GRID_STEP_K)
+
+    try:
+        grid_step_b: float = float(grid_step_b_str)
+    except ValueError:
         grid_step_b = float(DEFAULT_GRID_STEP_B)
 
     execute_optimization: bool = st.sidebar.button(
@@ -242,8 +266,8 @@ def render_sidebar(
         cable_no=cable_no,
         branch_no=branch_no,
         max_mode=int(max_mode),
-        manual_k=float(manual_k),
-        manual_b=float(manual_b),
+        manual_k=manual_k,
+        manual_b=manual_b,
         search_condition=search_condition,
         save_result=bool(save_result),
         execute_manual_update=bool(execute_manual_update),
