@@ -20,6 +20,7 @@ from config.defaults import (
     MAX_SUPPORTED_MODE,
 )
 from domain.models.search_condition import SearchCondition
+from ui.state.session_state_manager import reset_optimization_settings
 
 
 @dataclass
@@ -132,6 +133,14 @@ def render_sidebar(
 
     st.sidebar.divider()
     st.sidebar.subheader("探索設定")
+
+    current_key = (facility_name, cable_no, branch_no)
+    previous_key = st.session_state.get("current_sidebar_key")
+
+    if previous_key != current_key:
+        reset_optimization_settings()
+        st.session_state["current_sidebar_key"] = current_key
+
 
     method: str = st.sidebar.selectbox(
         label="探索方法",
@@ -260,6 +269,7 @@ def render_sidebar(
         manual_weights=None,
         use_normalized_mse=bool(use_normalized_mse),
     )
+
 
     return SidebarState(
         facility_name=facility_name,

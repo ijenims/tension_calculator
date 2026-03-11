@@ -3,6 +3,16 @@ from typing import Optional
 
 import pandas as pd
 
+from config.defaults import (
+    FACILITY,
+    CABLE_NO,
+    BRANCH_NO,
+    UNIT_WEIGHT,
+    CABLE_LENGTH,
+    DESIGN_TENSION,
+    DESIGN_RIGIDITY,
+    XI,
+)
 from domain.models.cable_record import CableRecord
 from infrastructure.repositories.cable_repository import CableRepository
 from domain.physics.design_rigidity_calculator import DesignRigidityCalculator
@@ -48,12 +58,12 @@ class ExcelCableRepository(CableRepository):
     @staticmethod
     def _validate_columns(df: pd.DataFrame) -> None:
         required = [
-            "施設名",
-            "ケーブルNo.",
-            "枝番",
-            "単位重量",
-            "ケーブル長",
-            "設計張力",
+            FACILITY,
+            CABLE_NO,
+            BRANCH_NO,
+            UNIT_WEIGHT,
+            CABLE_LENGTH,
+            DESIGN_TENSION,
         ]
 
         missing = [c for c in required if c not in df.columns]
@@ -62,7 +72,7 @@ class ExcelCableRepository(CableRepository):
 
     def get_facility_names(self) -> list[str]:
         df = self._load()
-        return sorted(df["施設名"].dropna().astype(str).unique().tolist())
+        return sorted(df[FACILITY].dropna().astype(str).unique().tolist())
 
     def get_cable_numbers(
         self,
@@ -70,10 +80,10 @@ class ExcelCableRepository(CableRepository):
     ) -> list[str]:
         df = self._load()
 
-        filtered = df[df["施設名"] == facility_name]
+        filtered = df[df[FACILITY] == facility_name]
 
         return sorted(
-            filtered["ケーブルNo."].dropna().astype(str).unique().tolist()
+            filtered[CABLE_NO].dropna().astype(str).unique().tolist()
         )
 
     def get_branch_numbers(
@@ -84,12 +94,12 @@ class ExcelCableRepository(CableRepository):
         df = self._load()
 
         filtered = df[
-            (df["施設名"] == facility_name)
-            & (df["ケーブルNo."] == cable_no)
+            (df[FACILITY] == facility_name)
+            & (df[CABLE_NO] == cable_no)
         ]
 
         return sorted(
-            filtered["枝番"].dropna().astype(str).unique().tolist()
+            filtered[BRANCH_NO].dropna().astype(str).unique().tolist()
         )
 
     def get_cable_record(
@@ -103,9 +113,9 @@ class ExcelCableRepository(CableRepository):
         df = self._load()
 
         filtered = df[
-            (df["施設名"].astype(str) == str(facility_name))
-            & (df["ケーブルNo."].astype(str) == str(cable_no))
-            & (df["枝番"].astype(str) == str(branch_no))
+            (df[FACILITY].astype(str) == str(facility_name))
+            & (df[CABLE_NO].astype(str) == str(cable_no))
+            & (df[BRANCH_NO].astype(str) == str(branch_no))
         ]
 
         if len(filtered) == 0:
@@ -119,36 +129,36 @@ class ExcelCableRepository(CableRepository):
         measured = self._extract_frequencies(row, max_mode)
 
         design_rigidity = (
-            float(row["設計剛性"])
-            if "設計剛性" in row and pd.notna(row["設計剛性"])
+            float(row[DESIGN_RIGIDITY])
+            if DESIGN_RIGIDITY in row and pd.notna(row[DESIGN_RIGIDITY])
             else None
         )
 
         if design_rigidity is None:
             design_rigidity = DesignRigidityCalculator.calculate_from_unit_weight(
-                unit_weight_kg_per_m=float(row["単位重量"])
+                unit_weight_kg_per_m=float(row[UNIT_WEIGHT])
             )
 
         xi = (
-            float(row["ξ"])
-            if "ξ" in row and pd.notna(row["ξ"])
+            float(row[XI])
+            if XI in row and pd.notna(row[XI])
             else None
         )
 
         if xi is None:
             xi = XiCalculator.calculate(
-                cable_length_m=float(row["ケーブル長"]),
-                tension_kN=float(row["設計張力"]),
+                cable_length_m=float(row[CABLE_LENGTH]),
+                tension_kN=float(row[DESIGN_TENSION]),
                 rigidity_Nm2=design_rigidity,
             )
 
         return CableRecord(
-            facility_name=str(row["施設名"]),
-            cable_no=str(row["ケーブルNo."]),
-            branch_no=str(row["枝番"]),
-            unit_weight_kg_per_m=float(row["単位重量"]),
-            cable_length_m=float(row["ケーブル長"]),
-            design_tension_kN=float(row["設計張力"]),
+            facility_name=str(row[FACILITY]),
+            cable_no=str(row[CABLE_NO]),
+            branch_no=str(row[BRANCH_NO]),
+            unit_weight_kg_per_m=float(row[UNIT_WEIGHT]),
+            cable_length_m=float(row[CABLE_LENGTH]),
+            design_tension_kN=float(row[DESIGN_TENSION]),
             design_rigidity_Nm2=design_rigidity,
             xi=xi,
             measured_frequencies_hz=measured,

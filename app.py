@@ -207,9 +207,9 @@ def main() -> None:
 
             col_left, col_right = st.columns(2)
             with col_left:
-                st.plotly_chart(freq_fig, use_container_width=True)
+                st.plotly_chart(freq_fig, width="stretch")
             with col_right:
-                st.plotly_chart(residual_fig, use_container_width=True)
+                st.plotly_chart(residual_fig, width="stretch")
 
             st.divider()
                 
@@ -234,7 +234,7 @@ def main() -> None:
                     aspect_ratio=(1.0, 1.0, 1.0),
                     mark_min=True,
                 )
-                st.plotly_chart(surface_fig, use_container_width=True)
+                st.plotly_chart(surface_fig, width="stretch")
             except Exception as exc:
                 st.error(f"3Dグラフ描画でエラー: {exc}")
 

@@ -3,7 +3,17 @@ from typing import Optional
 import numpy as np
 import streamlit as st
 
-from config.defaults import DEFAULT_MANUAL_B, DEFAULT_MANUAL_K, DEFAULT_MAX_MODE
+from config.defaults import (
+        DEFAULT_MANUAL_B, 
+        DEFAULT_MANUAL_K, 
+        DEFAULT_MAX_MODE, 
+        DEFAULT_K_MAX, 
+        DEFAULT_K_MIN, 
+        DEFAULT_B_MAX, 
+        DEFAULT_B_MIN, 
+        DEFAULT_GRID_STEP_K, 
+        DEFAULT_GRID_STEP_B
+        )
 from domain.models.calculation_result import CalculationResult
 
 
@@ -159,3 +169,10 @@ def reset_case_state(current_key: tuple) -> None:
         st.session_state["surface_B"] = None
         st.session_state["surface_Z"] = None
         
+def reset_optimization_settings() -> None:
+    st.session_state["sidebar_k_min"] = f"{DEFAULT_K_MIN:.1f}"
+    st.session_state["sidebar_k_max"] = f"{DEFAULT_K_MAX:.1f}"
+    st.session_state["sidebar_b_min"] = f"{DEFAULT_B_MIN:.1f}"
+    st.session_state["sidebar_b_max"] = f"{DEFAULT_B_MAX:.1f}"
+    st.session_state["sidebar_grid_step_k"] = f"{DEFAULT_GRID_STEP_K:.3f}"
+    st.session_state["sidebar_grid_step_b"] = f"{DEFAULT_GRID_STEP_B:.3f}"
