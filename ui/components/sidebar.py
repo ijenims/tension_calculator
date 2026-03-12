@@ -19,14 +19,15 @@ from config.defaults import (
     DEFAULT_WEIGHT_MODE,
     MAX_SUPPORTED_MODE,
 )
-from domain.models.search_condition import SearchCondition
-from ui.state.session_state_manager import reset_optimization_settings
 
 
 @dataclass
 class SidebarState:
     """
-    サイドバー入力状態を保持するデータクラス。
+    サイドバー入力値を保持する UI 状態オブジェクト。
+
+    このクラスは widget の入力結果を app.py に受け渡すためだけに使う。
+    業務ロジック上の探索条件オブジェクトは保持しない。
     """
 
     facility_name: Optional[str]
@@ -38,12 +39,20 @@ class SidebarState:
     manual_k: float
     manual_b: float
 
-    search_condition: SearchCondition
+    method: str
+    k_min: float
+    k_max: float
+    b_min: float
+    b_max: float
+    grid_step_k: float
+    grid_step_b: float
+    weight_mode: str
+    use_normalized_mse: bool
 
     save_result: bool
     execute_manual_update: bool
     execute_optimization: bool
-    execute_save: bool
+    reset_search_settings: bool
 
 
 def render_sidebar(
@@ -52,20 +61,17 @@ def render_sidebar(
     branch_numbers: list[str],
 ) -> SidebarState:
     """
-    サイドバーを描画し、入力状態を SidebarState として返す。
+    サイドバーを描画し、入力値を SidebarState として返す。
 
-    Args:
-        facility_names:
-            施設名候補一覧。
-        cable_numbers:
-            選択済み施設名に対応するケーブルNo候補一覧。
-        branch_numbers:
-            選択済み施設名・ケーブルNoに対応する枝番候補一覧。
-
-    Returns:
-        SidebarState:
-            サイドバーで入力された状態。
+    設計方針:
+        - case 選択は通常 widget
+        - 手動検証は form 内で submit 時のみ確定
+        - 探索方法は form 外に置き、切替時に即 rerun させる
+        - 探索設定リセットは明示ボタンで行う
+        - widget key を唯一の表示状態とし、二重管理を避ける
     """
+    _initialize_sidebar_state()
+
     st.sidebar.header("条件入力")
 
     facility_name: Optional[str] = _render_selectbox(
@@ -86,161 +92,136 @@ def render_sidebar(
         key="sidebar_branch_no",
     )
 
-    st.sidebar.divider()
     st.sidebar.subheader("モード設定")
 
-    max_mode: int = st.sidebar.number_input(
-        label="最大次数",
-        min_value=1,
-        max_value=MAX_SUPPORTED_MODE,
-        value=DEFAULT_MAX_MODE,
-        step=1,
-        key="sidebar_max_mode",
+    max_mode: int = int(
+        st.sidebar.number_input(
+            label="最大次数",
+            min_value=1,
+            max_value=MAX_SUPPORTED_MODE,
+            value=DEFAULT_MAX_MODE,
+            step=1,
+            key="sidebar_max_mode",
+        )
     )
 
+    # -------------------------
+    # 手動検証
+    # -------------------------
     st.sidebar.divider()
     st.sidebar.subheader("手動検証")
 
-    col_k, col_b = st.sidebar.columns(2)
+    execute_manual_update: bool = False
 
-    manual_k_str: str = col_k.text_input(
-        label="k：張力の係数",
-        value=f"{DEFAULT_MANUAL_K:.2f}",
-        key="sidebar_manual_k",
-    )
+    with st.sidebar.form("manual_update_form", clear_on_submit=False):
+        col_k, col_b = st.columns(2)
 
-    manual_b_str: str = col_b.text_input(
-        label="b：EIの係数(β)",
-        value=f"{DEFAULT_MANUAL_B:.2f}",
-        key="sidebar_manual_b",
-    )
+        manual_k_str: str = col_k.text_input(
+            label="k：張力の係数",
+            key="sidebar_manual_k",
+        )
 
-    try:
-        manual_k: float = float(manual_k_str)
-    except ValueError:
-        manual_k = float(DEFAULT_MANUAL_K)
+        manual_b_str: str = col_b.text_input(
+            label="b：EIの係数(β)",
+            key="sidebar_manual_b",
+        )
 
-    try:
-        manual_b: float = float(manual_b_str)
-    except ValueError:
-        manual_b = float(DEFAULT_MANUAL_B)
+        execute_manual_update = st.form_submit_button(
+            label="理論周波数更新",
+            width='stretch',
+        )
 
-    execute_manual_update: bool = st.sidebar.button(
-        label="理論周波数更新",
-        use_container_width=True,
-        key="sidebar_execute_manual_update",
-    )
+    manual_k: float = _parse_float(manual_k_str, DEFAULT_MANUAL_K)
+    manual_b: float = _parse_float(manual_b_str, DEFAULT_MANUAL_B)
 
+    # -------------------------
+    # 探索設定
+    # -------------------------
     st.sidebar.divider()
     st.sidebar.subheader("探索設定")
 
-    current_key = (facility_name, cable_no, branch_no)
-    previous_key = st.session_state.get("current_sidebar_key")
+    reset_search_settings: bool = st.sidebar.button(
+        label="デフォルト値に戻す",
+        width='stretch',
+        key="sidebar_reset_search_settings",
+    )
 
-    if previous_key != current_key:
-        reset_optimization_settings()
-        st.session_state["current_sidebar_key"] = current_key
-
+    if reset_search_settings:
+        _reset_search_widget_state()
 
     method: str = st.sidebar.selectbox(
         label="探索方法",
         options=["grid", "scipy"],
-        index=0 if DEFAULT_METHOD == "grid" else 1,
-        key="sidebar_method",
+        index=_get_method_index(st.session_state["sidebar_search_method"]),
+        key="sidebar_search_method",
     )
 
-    col_k_min, col_k_max = st.sidebar.columns(2)
-    k_min_str: str = col_k_min.text_input(
-        label="k_min",
-        value=f"{DEFAULT_K_MIN:.1f}",
-        key="sidebar_k_min",
-    )
-    k_max_str: str = col_k_max.text_input(
-        label="k_max",
-        value=f"{DEFAULT_K_MAX:.1f}",
-        key="sidebar_k_max",
-    )
+    execute_optimization: bool = False
 
-    col_b_min, col_b_max = st.sidebar.columns(2)
-    b_min_str: str = col_b_min.text_input(
-        label="b_min",
-        value=f"{DEFAULT_B_MIN:.1f}",
-        key="sidebar_b_min",
-    )
-    b_max_str: str = col_b_max.text_input(
-        label="b_max",
-        value=f"{DEFAULT_B_MAX:.1f}",
-        key="sidebar_b_max",
-    )
-
-    if method == "grid":
-        col_step_k, col_step_b = st.sidebar.columns(2)
-        grid_step_k_str: str = col_step_k.text_input(
-            label="grid_step_k",
-            value=f"{DEFAULT_GRID_STEP_K:.3f}",
-            key="sidebar_grid_step_k",
+    with st.sidebar.form("search_condition_form", clear_on_submit=False):
+        col_k_min, col_k_max = st.columns(2)
+        k_min_str: str = col_k_min.text_input(
+            label="k_min",
+            key="sidebar_k_min",
         )
-        grid_step_b_str: str = col_step_b.text_input(
-            label="grid_step_b",
-            value=f"{DEFAULT_GRID_STEP_B:.3f}",
-            key="sidebar_grid_step_b",
+        k_max_str: str = col_k_max.text_input(
+            label="k_max",
+            key="sidebar_k_max",
         )
-    else:
-        grid_step_k_str = f"{DEFAULT_GRID_STEP_K:.3f}"
-        grid_step_b_str = f"{DEFAULT_GRID_STEP_B:.3f}"
 
-    try:
-        k_min: float = float(k_min_str)
-    except ValueError:
-        k_min = float(DEFAULT_K_MIN)
+        col_b_min, col_b_max = st.columns(2)
+        b_min_str: str = col_b_min.text_input(
+            label="b_min",
+            key="sidebar_b_min",
+        )
+        b_max_str: str = col_b_max.text_input(
+            label="b_max",
+            key="sidebar_b_max",
+        )
 
-    try:
-        k_max: float = float(k_max_str)
-    except ValueError:
-        k_max = float(DEFAULT_K_MAX)
+        if method == "grid":
+            col_step_k, col_step_b = st.columns(2)
+            grid_step_k_str: str = col_step_k.text_input(
+                label="grid_step_k",
+                key="sidebar_grid_step_k",
+                disabled=(method != "grid"),
+            )
+            grid_step_b_str: str = col_step_b.text_input(
+                label="grid_step_b",
+                key="sidebar_grid_step_b",
+                disabled=(method != "grid"),
+            )
+        else:
+            grid_step_k_str = st.session_state["sidebar_grid_step_k"]
+            grid_step_b_str = st.session_state["sidebar_grid_step_b"]
 
-    try:
-        b_min: float = float(b_min_str)
-    except ValueError:
-        b_min = float(DEFAULT_B_MIN)
+        weight_mode: str = st.selectbox(
+            label="重み付け",
+            options=["none", "mode_number", "manual"],
+            index=_get_weight_mode_index(st.session_state["sidebar_weight_mode"]),
+            key="sidebar_weight_mode",
+        )
 
-    try:
-        b_max: float = float(b_max_str)
-    except ValueError:
-        b_max = float(DEFAULT_B_MAX)
+        use_normalized_mse: bool = st.checkbox(
+            label="normalized MSE を使う",
+            key="sidebar_use_normalized_mse",
+        )
 
-    try:
-        grid_step_k: float = float(grid_step_k_str)
-    except ValueError:
-        grid_step_k = float(DEFAULT_GRID_STEP_K)
+        execute_optimization = st.form_submit_button(
+            label="最適化実行",
+            width='stretch',
+        )
 
-    try:
-        grid_step_b: float = float(grid_step_b_str)
-    except ValueError:
-        grid_step_b = float(DEFAULT_GRID_STEP_B)
+    k_min: float = _parse_float(k_min_str, DEFAULT_K_MIN)
+    k_max: float = _parse_float(k_max_str, DEFAULT_K_MAX)
+    b_min: float = _parse_float(b_min_str, DEFAULT_B_MIN)
+    b_max: float = _parse_float(b_max_str, DEFAULT_B_MAX)
+    grid_step_k: float = _parse_float(grid_step_k_str, DEFAULT_GRID_STEP_K)
+    grid_step_b: float = _parse_float(grid_step_b_str, DEFAULT_GRID_STEP_B)
 
-    execute_optimization: bool = st.sidebar.button(
-        label="最適化実行",
-        use_container_width=True,
-        key="sidebar_execute_optimization",
-    )
-
-    st.sidebar.divider()
-    st.sidebar.subheader("誤差評価")
-
-    weight_mode: str = st.sidebar.selectbox(
-        label="重み付け",
-        options=["none", "mode_number", "manual"],
-        index=_get_weight_mode_index(DEFAULT_WEIGHT_MODE),
-        key="sidebar_weight_mode",
-    )
-
-    use_normalized_mse: bool = st.sidebar.checkbox(
-        label="normalized MSE を使う",
-        value=DEFAULT_USE_NORMALIZED_MSE,
-        key="sidebar_use_normalized_mse",
-    )
-
+    # -------------------------
+    # 保存
+    # -------------------------
     st.sidebar.divider()
     st.sidebar.subheader("保存")
 
@@ -250,40 +231,72 @@ def render_sidebar(
         key="sidebar_save_result",
     )
 
-    execute_save: bool = st.sidebar.button(
-        label="保存",
-        use_container_width=True,
-        disabled=not save_result,
-        key="sidebar_execute_save",
-    )
-
-    search_condition = SearchCondition(
-        method=method,
-        k_min=float(k_min),
-        k_max=float(k_max),
-        b_min=float(b_min),
-        b_max=float(b_max),
-        grid_step_k=float(grid_step_k),
-        grid_step_b=float(grid_step_b),
-        weight_mode=weight_mode,
-        manual_weights=None,
-        use_normalized_mse=bool(use_normalized_mse),
-    )
-
-
     return SidebarState(
         facility_name=facility_name,
         cable_no=cable_no,
         branch_no=branch_no,
-        max_mode=int(max_mode),
+        max_mode=max_mode,
         manual_k=manual_k,
         manual_b=manual_b,
-        search_condition=search_condition,
-        save_result=bool(save_result),
-        execute_manual_update=bool(execute_manual_update),
-        execute_optimization=bool(execute_optimization),
-        execute_save=bool(execute_save),
+        method=method,
+        k_min=k_min,
+        k_max=k_max,
+        b_min=b_min,
+        b_max=b_max,
+        grid_step_k=grid_step_k,
+        grid_step_b=grid_step_b,
+        weight_mode=weight_mode,
+        use_normalized_mse=use_normalized_mse,
+        save_result=save_result,
+        execute_manual_update=execute_manual_update,
+        execute_optimization=execute_optimization,
+        reset_search_settings=reset_search_settings,
     )
+
+
+def _initialize_sidebar_state() -> None:
+    """
+    sidebar 用 widget state を初期化する。
+
+    widget key 自体を唯一の表示状態として使うため、
+    初期値はここで一度だけ投入する。
+    """
+    defaults: dict[str, object] = {
+        "sidebar_manual_k": f"{DEFAULT_MANUAL_K:.2f}",
+        "sidebar_manual_b": f"{DEFAULT_MANUAL_B:.2f}",
+        "sidebar_search_method": DEFAULT_METHOD,
+        "sidebar_k_min": f"{DEFAULT_K_MIN:.1f}",
+        "sidebar_k_max": f"{DEFAULT_K_MAX:.1f}",
+        "sidebar_b_min": f"{DEFAULT_B_MIN:.1f}",
+        "sidebar_b_max": f"{DEFAULT_B_MAX:.1f}",
+        "sidebar_grid_step_k": f"{DEFAULT_GRID_STEP_K:.3f}",
+        "sidebar_grid_step_b": f"{DEFAULT_GRID_STEP_B:.3f}",
+        "sidebar_weight_mode": DEFAULT_WEIGHT_MODE,
+        "sidebar_use_normalized_mse": DEFAULT_USE_NORMALIZED_MSE,
+    }
+
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def _reset_search_widget_state() -> None:
+    """
+    探索設定 widget の表示値をデフォルトに戻す。
+
+    注意:
+        reset 対象は探索設定のみ。
+        手動検証の k, b はここでは触らない。
+    """
+    st.session_state["sidebar_search_method"] = DEFAULT_METHOD
+    st.session_state["sidebar_k_min"] = f"{DEFAULT_K_MIN:.1f}"
+    st.session_state["sidebar_k_max"] = f"{DEFAULT_K_MAX:.1f}"
+    st.session_state["sidebar_b_min"] = f"{DEFAULT_B_MIN:.1f}"
+    st.session_state["sidebar_b_max"] = f"{DEFAULT_B_MAX:.1f}"
+    st.session_state["sidebar_grid_step_k"] = f"{DEFAULT_GRID_STEP_K:.3f}"
+    st.session_state["sidebar_grid_step_b"] = f"{DEFAULT_GRID_STEP_B:.3f}"
+    st.session_state["sidebar_weight_mode"] = DEFAULT_WEIGHT_MODE
+    st.session_state["sidebar_use_normalized_mse"] = DEFAULT_USE_NORMALIZED_MSE
 
 
 def _render_selectbox(
@@ -292,19 +305,7 @@ def _render_selectbox(
     key: str,
 ) -> Optional[str]:
     """
-    候補が空の場合に None を返す selectbox ラッパー。
-
-    Args:
-        label:
-            表示ラベル。
-        options:
-            候補一覧。
-        key:
-            Streamlit widget key。
-
-    Returns:
-        Optional[str]:
-            選択値。候補が空なら None。
+    候補が空の場合は disabled の selectbox を表示し、None を返す。
     """
     if len(options) == 0:
         st.sidebar.selectbox(
@@ -324,19 +325,33 @@ def _render_selectbox(
     )
 
 
-def _get_weight_mode_index(default_weight_mode: str) -> int:
+def _parse_float(value: str, default: float) -> float:
     """
-    重み付け方式のデフォルトindexを返す。
+    文字列を float に変換する。
 
-    Args:
-        default_weight_mode:
-            デフォルトの重み付け方式。
+    変換できない場合は default を返す。
+    """
+    try:
+        return float(value)
+    except ValueError:
+        return float(default)
 
-    Returns:
-        int:
-            selectbox 用 index。
+
+def _get_method_index(method: str) -> int:
+    """
+    探索方法の index を返す。
+    """
+    options: list[str] = ["grid", "scipy"]
+    if method in options:
+        return options.index(method)
+    return 0
+
+
+def _get_weight_mode_index(weight_mode: str) -> int:
+    """
+    重み付け方式の index を返す。
     """
     options: list[str] = ["none", "mode_number", "manual"]
-    if default_weight_mode in options:
-        return options.index(default_weight_mode)
+    if weight_mode in options:
+        return options.index(weight_mode)
     return 0

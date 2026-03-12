@@ -62,6 +62,25 @@ def main() -> None:
         branch_numbers=_get_branch_numbers(cable_repository, facility_names),
     )
 
+    from ui.state.session_state_manager import (
+        get_search_condition,
+    )
+
+
+    # ② SearchCondition取得
+    search_condition = get_search_condition()
+
+    # ③ Sidebar入力を反映
+    search_condition.method = sidebar_state.method
+    search_condition.k_min = sidebar_state.k_min
+    search_condition.k_max = sidebar_state.k_max
+    search_condition.b_min = sidebar_state.b_min
+    search_condition.b_max = sidebar_state.b_max
+    search_condition.grid_step_k = sidebar_state.grid_step_k
+    search_condition.grid_step_b = sidebar_state.grid_step_b
+    search_condition.weight_mode = sidebar_state.weight_mode
+    search_condition.use_normalized_mse = sidebar_state.use_normalized_mse
+
     current_key = (
         sidebar_state.facility_name,
         sidebar_state.cable_no,
@@ -154,7 +173,7 @@ def main() -> None:
                 k=sidebar_state.manual_k,
                 b=sidebar_state.manual_b,
                 use_mask=edited_use_mask,
-                condition=sidebar_state.search_condition,
+                condition=search_condition,
             )
             set_last_result(result)
             st.session_state["editor_theoretical"] = result.theoretical_frequencies_hz
@@ -164,18 +183,18 @@ def main() -> None:
 
     elif sidebar_state.execute_optimization:
         try:
-            if sidebar_state.search_condition.method == "grid":
+            if search_condition.method == "grid":
                 result, K, B, Z = optimization_service.optimize_with_surface(
                     cable=working_cable,
                     use_mask=edited_use_mask,
-                    condition=sidebar_state.search_condition,
+                    condition=search_condition,
                 )
                 set_surface_data(K=K, B=B, Z=Z)
             else:
                 result = optimization_service.optimize(
                     cable=working_cable,
                     use_mask=edited_use_mask,
-                    condition=sidebar_state.search_condition,
+                    condition=search_condition,
                 )
                 clear_surface_data()
 
@@ -218,7 +237,7 @@ def main() -> None:
 
         K, B, Z = get_surface_data()
         if (
-            sidebar_state.search_condition.method == "grid"
+            search_condition.method == "grid"
             and K is not None
             and B is not None
             and Z is not None
@@ -247,12 +266,12 @@ def main() -> None:
         try:
             method_label = _build_method_label(
                 is_manual_update=sidebar_state.execute_manual_update,
-                optimization_method=sidebar_state.search_condition.method,
+                optimization_method=search_condition.method,
             )
             result_repository.append_result(
                 cable=working_cable,
                 result=result,
-                condition=sidebar_state.search_condition,
+                condition=search_condition,
                 method=method_label,
             )
             st.success("結果を保存したで。")

@@ -15,7 +15,7 @@ class ExcelResultRepository:
 
     def __init__(
         self,
-        filepath: str,
+        filepath: str | Path,
         sheet_name: str = "results",
     ) -> None:
         self._filepath = Path(filepath)

@@ -26,7 +26,7 @@ class ExcelCableRepository(CableRepository):
 
     def __init__(
         self,
-        filepath: str,
+        filepath: str | Path,
         sheet_name: Optional[str] = None,
     ) -> None:
         self._filepath = Path(filepath)
