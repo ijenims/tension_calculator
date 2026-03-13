@@ -2,8 +2,9 @@ from pathlib import Path
 
 DATA_DIR = Path("data")
 
-MASTER_FILEPATH = DATA_DIR / "cable_master.xlsx"
+# MASTER_FILEPATH = DATA_DIR / "cable_master.xlsx"
 RESULT_FILEPATH = DATA_DIR / "calc_results.xlsx"
+CABLE_MASTER_URL = "https://docs.google.com/spreadsheets/d/1-L0YyQDRiybPSdwS3U486fMbhuaq5CcL/export?format=xlsx"
 
 MASTER_SHEET_NAME = "master"
 RESULT_SHEET_NAME = "results"

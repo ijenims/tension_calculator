@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+import io
+import requests
 
 from config.defaults import (
     FACILITY,
@@ -29,20 +31,33 @@ class ExcelCableRepository(CableRepository):
         filepath: str | Path,
         sheet_name: Optional[str] = None,
     ) -> None:
-        self._filepath = Path(filepath)
+        self._filepath = filepath
         self._sheet_name = sheet_name
         self._df: Optional[pd.DataFrame] = None
 
     def _load(self) -> pd.DataFrame:
         if self._df is None:
-            if not self._filepath.exists():
-                raise FileNotFoundError(f"Master file not found: {self._filepath}")
+            source = str(self._filepath)
 
-            df = pd.read_excel(
-                self._filepath,
-                sheet_name=self._sheet_name,
-                engine="openpyxl",
-            )
+            if source.startswith("http"):
+                response = requests.get(source, timeout=30)
+                response.raise_for_status()
+                df = pd.read_excel(
+                    io.BytesIO(response.content),
+                    sheet_name=self._sheet_name,
+                    engine="openpyxl",
+                )
+            else:
+                path = Path(source)
+
+                if not path.exists():
+                    raise FileNotFoundError(f"Master file not found: {path}")
+
+                df = pd.read_excel(
+                    path,
+                    sheet_name=self._sheet_name,
+                    engine="openpyxl",
+                )
 
             if isinstance(df, dict):
                 df = list(df.values())[0]

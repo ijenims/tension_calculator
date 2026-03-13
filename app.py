@@ -2,7 +2,7 @@ from typing import Optional
 
 import streamlit as st
 
-from config.defaults import APP_TITLE, MASTER_FILEPATH, RESULT_FILEPATH, RESULT_SHEET_NAME, MASTER_SHEET_NAME
+from config.defaults import APP_TITLE, CABLE_MASTER_URL, RESULT_FILEPATH, RESULT_SHEET_NAME, MASTER_SHEET_NAME
 from domain.models.calculation_result import CalculationResult
 from domain.physics.frequency_formula import FrequencyFormula
 from infrastructure.repositories.excel_cable_repository import ExcelCableRepository
@@ -44,7 +44,7 @@ def main() -> None:
     initialize_session_state()
 
     cable_repository = ExcelCableRepository(
-        filepath=MASTER_FILEPATH,
+        filepath=CABLE_MASTER_URL,
         sheet_name=MASTER_SHEET_NAME,
         )
     result_repository = ExcelResultRepository(
