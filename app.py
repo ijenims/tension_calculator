@@ -2,7 +2,7 @@ from typing import Optional
 
 import streamlit as st
 
-from config.defaults import APP_TITLE, MASTER_FILEPATH, RESULT_FILEPATH, RESULT_SHEET_NAME, MASTER_SHEET_NAME
+from config.defaults import APP_TITLE, RESULT_FILEPATH, RESULT_SHEET_NAME, MASTER_SHEET_NAME
 from domain.models.calculation_result import CalculationResult
 from domain.physics.frequency_formula import FrequencyFormula
 from infrastructure.repositories.excel_cable_repository import ExcelCableRepository
@@ -14,6 +14,7 @@ from ui.components.frequency_editor import render_frequency_editor
 from ui.components.result_panel import render_result_panel
 from ui.components.save_panel import render_save_panel
 from ui.components.sidebar import SidebarState, render_sidebar
+from ui.components.master_file_uploader import render_master_file_uploader
 from ui.state.session_state_manager import (
     clear_surface_data,
     get_frequency_state,
@@ -43,8 +44,14 @@ def main() -> None:
 
     initialize_session_state()
 
+    uploaded_master_file = render_master_file_uploader()
+
+    if uploaded_master_file is None:
+        st.info("cable_master.xlsx をアップロードしてくれ。")
+        return
+
     cable_repository = ExcelCableRepository(
-        filepath=MASTER_FILEPATH,
+        filepath=uploaded_master_file,
         sheet_name=MASTER_SHEET_NAME,
         )
     result_repository = ExcelResultRepository(
@@ -147,6 +154,8 @@ def main() -> None:
         set_last_result(None)
         clear_surface_data()
 
+    st.divider()
+    
     render_spec_panel(cable)
 
     edited_measured_frequencies_hz, edited_use_mask = render_frequency_editor(
