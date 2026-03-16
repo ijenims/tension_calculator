@@ -208,6 +208,7 @@ def render_sidebar(
         )
 
         execute_optimization = st.form_submit_button(
+            type="primary",
             label="最適化実行",
             width='stretch',
         )

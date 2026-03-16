@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, BinaryIO
 
 import pandas as pd
 
@@ -26,23 +26,35 @@ class ExcelCableRepository(CableRepository):
 
     def __init__(
         self,
-        filepath: str | Path,
+        filepath: str | Path | BinaryIO,
         sheet_name: Optional[str] = None,
     ) -> None:
-        self._filepath = Path(filepath)
+        self._filepath = filepath
         self._sheet_name = sheet_name
         self._df: Optional[pd.DataFrame] = None
 
     def _load(self) -> pd.DataFrame:
         if self._df is None:
-            if not self._filepath.exists():
-                raise FileNotFoundError(f"Master file not found: {self._filepath}")
+            if isinstance(self._filepath, (str, Path)):
 
-            df = pd.read_excel(
-                self._filepath,
-                sheet_name=self._sheet_name,
-                engine="openpyxl",
-            )
+                path = Path(self._filepath)
+
+                if not path.exists():
+                    raise FileNotFoundError(f"Master file not found: {path}")
+
+                df = pd.read_excel(
+                    path,
+                    sheet_name=self._sheet_name,
+                    engine="openpyxl",
+                )
+
+            else:
+
+                df = pd.read_excel(
+                    self._filepath,
+                    sheet_name=self._sheet_name,
+                    engine="openpyxl",
+                )
 
             if isinstance(df, dict):
                 df = list(df.values())[0]
