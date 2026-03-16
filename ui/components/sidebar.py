@@ -159,20 +159,20 @@ def render_sidebar(
     execute_optimization: bool = False
 
     with st.sidebar.form("search_condition_form", clear_on_submit=False):
-        col_k_min, col_k_max = st.columns(2)
+        col_k_min, col_b_min = st.columns(2)
         k_min_str: str = col_k_min.text_input(
             label="k_min",
             key="sidebar_k_min",
         )
-        k_max_str: str = col_k_max.text_input(
-            label="k_max",
-            key="sidebar_k_max",
-        )
-
-        col_b_min, col_b_max = st.columns(2)
         b_min_str: str = col_b_min.text_input(
             label="b_min",
             key="sidebar_b_min",
+        )
+
+        col_k_max, col_b_max = st.columns(2)
+        k_max_str: str = col_k_max.text_input(
+            label="k_max",
+            key="sidebar_k_max",
         )
         b_max_str: str = col_b_max.text_input(
             label="b_max",
@@ -306,24 +306,33 @@ def _render_selectbox(
     key: str,
 ) -> Optional[str]:
     """
-    候補が空の場合は disabled の selectbox を表示し、None を返す。
+    先頭にプレースホルダを出し、未選択なら None を返す。
     """
+    placeholder = "選択してください"
+
     if len(options) == 0:
         st.sidebar.selectbox(
             label=label,
-            options=["-"],
+            options=[placeholder],
             index=0,
             disabled=True,
             key=key,
         )
         return None
 
-    return st.sidebar.selectbox(
+    display_options = [placeholder] + options
+
+    selected: str = st.sidebar.selectbox(
         label=label,
-        options=options,
+        options=display_options,
         index=0,
         key=key,
     )
+
+    if selected == placeholder:
+        return None
+
+    return selected
 
 
 def _parse_float(value: str, default: float) -> float:

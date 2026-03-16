@@ -256,7 +256,7 @@ def main() -> None:
                     K=K,
                     B=B,
                     Z=Z,
-                    title="Objective Surface (MSE)",
+                    title="Mean Squared Error",
                     show_contours=True,
                     orthographic=True,
                     aspect_ratio=(1.0, 1.0, 1.0),

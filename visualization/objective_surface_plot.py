@@ -53,7 +53,7 @@ def create_objective_surface_plot(
     K: np.ndarray,
     B: np.ndarray,
     Z: np.ndarray,
-    title: str = "Objective Surface (MSE)",
+    title: str = "Mean Squared Error",
     show_contours: bool = True,
     orthographic: bool = True,
     aspect_ratio: tuple[float, float, float] = (1.0, 1.0, 1.0),
@@ -97,6 +97,7 @@ def create_objective_surface_plot(
         x=K,
         y=B,
         z=Z_plot,
+        colorscale='rainbow',  # カラースケール
         opacity=0.8,    # サーフェスの透明度
         contours=dict(
             x=dict(show=show_contours, project_x=True),
