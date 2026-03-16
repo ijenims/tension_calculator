@@ -8,7 +8,7 @@ from domain.models.cable_record import CableRecord
 def _fmt(value: Optional[float], digits: int = 3) -> str:
     if value is None:
         return "-"
-    return f"{value:.{digits}f}"
+    return f"{value:,.{digits}f}"
 
 
 def render_spec_panel(cable: Optional[CableRecord]) -> None:
