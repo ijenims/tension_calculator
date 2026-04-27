@@ -1,5 +1,4 @@
-data/cable_master.xlsx
-data/calc_results.xlsx
+/data/
 
 # Python cache
 __pycache__/
