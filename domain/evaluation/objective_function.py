@@ -42,10 +42,10 @@ def objective_function(
     """
     try:
         if cable.design_rigidity_Nm2 is None:
-            return np.inf
+            return 1e10
 
         if len(use_mask) != cable.max_mode:
-            return np.inf
+            return 1e10
 
         tension_kN: float = cable.design_tension_kN * k
         rigidity_Nm2: float = cable.design_rigidity_Nm2 * b
@@ -89,4 +89,4 @@ def objective_function(
         )
 
     except (ValueError, ZeroDivisionError, OverflowError, FloatingPointError):
-        return np.inf
+        return 1e10
