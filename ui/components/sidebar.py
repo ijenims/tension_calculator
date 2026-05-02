@@ -20,6 +20,8 @@ from config.defaults import (
     MAX_SUPPORTED_MODE,
 )
 
+CONDITION_INPUT_SIGNATURE_KEY = "_sidebar_condition_input_signature"
+
 
 @dataclass
 class SidebarState:
@@ -53,6 +55,8 @@ class SidebarState:
     execute_manual_update: bool
     execute_optimization: bool
     reset_search_settings: bool
+
+    surface_z_cap_max: Optional[float]
 
 
 def render_sidebar(
@@ -90,6 +94,12 @@ def render_sidebar(
         label="枝番",
         options=branch_numbers,
         key="sidebar_branch_no",
+    )
+
+    _maybe_reset_surface_z_cap_on_condition_input_change(
+        facility_name=facility_name,
+        cable_no=cable_no,
+        branch_no=branch_no,
     )
 
     st.sidebar.subheader("モード設定")
@@ -220,6 +230,16 @@ def render_sidebar(
     grid_step_k: float = _parse_float(grid_step_k_str, DEFAULT_GRID_STEP_K)
     grid_step_b: float = _parse_float(grid_step_b_str, DEFAULT_GRID_STEP_B)
 
+    st.sidebar.divider()
+    with st.sidebar.expander("3D サーフェス（grid）", expanded=False):
+        surface_z_cap_str: str = st.text_input(
+            label="MSE 表示上限（空欄＝自動・1e9未満のみで99%分位）",
+            key="sidebar_surface_z_cap",
+            placeholder="例: 0.05",
+        )
+
+    surface_z_cap_max: Optional[float] = _parse_optional_positive_float(surface_z_cap_str)
+
     # -------------------------
     # 保存
     # -------------------------
@@ -252,7 +272,29 @@ def render_sidebar(
         execute_manual_update=execute_manual_update,
         execute_optimization=execute_optimization,
         reset_search_settings=reset_search_settings,
+        surface_z_cap_max=surface_z_cap_max,
     )
+
+
+def _maybe_reset_surface_z_cap_on_condition_input_change(
+    facility_name: Optional[str],
+    cable_no: Optional[str],
+    branch_no: Optional[str],
+) -> None:
+    """
+    「条件入力」（施設・ケーブルNo・枝番）が変わったら、3D 用 MSE 上限の手入力を空に戻す。
+    """
+    sig: tuple[Optional[str], Optional[str], Optional[str]] = (
+        facility_name,
+        cable_no,
+        branch_no,
+    )
+    prev: Optional[tuple[Optional[str], Optional[str], Optional[str]]] = st.session_state.get(
+        CONDITION_INPUT_SIGNATURE_KEY
+    )
+    st.session_state[CONDITION_INPUT_SIGNATURE_KEY] = sig
+    if prev is not None and prev != sig:
+        st.session_state["sidebar_surface_z_cap"] = ""
 
 
 def _initialize_sidebar_state() -> None:
@@ -274,6 +316,7 @@ def _initialize_sidebar_state() -> None:
         "sidebar_grid_step_b": f"{DEFAULT_GRID_STEP_B:.3f}",
         "sidebar_weight_mode": DEFAULT_WEIGHT_MODE,
         "sidebar_use_normalized_mse": DEFAULT_USE_NORMALIZED_MSE,
+        "sidebar_surface_z_cap": "",
     }
 
     for key, value in defaults.items():
@@ -333,6 +376,22 @@ def _render_selectbox(
         return None
 
     return selected
+
+
+def _parse_optional_positive_float(value: str) -> Optional[float]:
+    """
+    空・空白は None。正の float ならその値。それ以外は None。
+    """
+    stripped: str = value.strip()
+    if not stripped:
+        return None
+    try:
+        parsed: float = float(stripped)
+    except ValueError:
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
 
 
 def _parse_float(value: str, default: float) -> float:

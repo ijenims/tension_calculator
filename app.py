@@ -261,6 +261,7 @@ def main() -> None:
                     orthographic=True,
                     aspect_ratio=(1.0, 1.0, 1.0),
                     mark_min=True,
+                    z_cap_max=sidebar_state.surface_z_cap_max,
                 )
                 st.plotly_chart(surface_fig, width="stretch")
             except Exception as exc:
