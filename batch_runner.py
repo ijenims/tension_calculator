@@ -72,9 +72,8 @@ def main() -> None:
             # use_mask: 実測周波数があるモードだけ True
             use_mask = [f is not None for f in cable.measured_frequencies_hz]
 
-            # 探索条件: デフォルト + grid_step_b = 0.01
+            # 探索条件: デフォルト（多段 grid は optimizer 側の刻みを使用）
             condition = SearchCondition.default()
-            condition.grid_step_b = 0.01
 
             result = service.optimize(
                 cable=cable,

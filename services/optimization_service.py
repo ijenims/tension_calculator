@@ -2,6 +2,14 @@ from typing import Callable
 
 import numpy as np
 
+from config.grid_multistage import (
+    SURFACE_GRID_STEP_B,
+    SURFACE_GRID_STEP_K,
+    SURFACE_ZOOM_B_HALF,
+    SURFACE_ZOOM_GRID_STEP_B,
+    SURFACE_ZOOM_GRID_STEP_K,
+    SURFACE_ZOOM_K_HALF,
+)
 from domain.evaluation.objective_function import objective_function
 from domain.models.calculation_result import CalculationResult
 from domain.models.cable_record import CableRecord
@@ -105,9 +113,18 @@ class OptimizationService:
         cable: CableRecord,
         use_mask: list[bool],
         condition: SearchCondition,
-    ) -> tuple[CalculationResult, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[
+        CalculationResult,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+    ]:
         """
-        グリッドサーチを実行し、結果に加えて 3D 表示用の K, B, Z を返す。
+        グリッドサーチを実行し、結果に加えて 3D 表示用の K, B, Z（全域・粗）と
+        最小付近（細）の Kz, Bz, Zz を返す。
 
         Args:
             cable:
@@ -118,11 +135,8 @@ class OptimizationService:
                 探索条件。method は "grid" を想定。
 
         Returns:
-            tuple[CalculationResult, np.ndarray, np.ndarray, np.ndarray]:
-                - CalculationResult
-                - K: k の meshgrid
-                - B: b の meshgrid
-                - Z: 各点の MSE
+            tuple:
+                CalculationResult, K, B, Z（粗・全域）, Kz, Bz, Zz（細・最適解周辺）
 
         Raises:
             ValueError:
@@ -145,14 +159,52 @@ class OptimizationService:
             condition=condition,
         )
 
-        K, B, Z = self._grid_optimizer.evaluate_surface(
+        k_opt, b_opt, mse_min = self._grid_optimizer.optimize(
             objective_function=objective,
             condition=condition,
         )
 
-        k_opt, b_opt, mse_min = self._grid_optimizer.optimize(
+        k_mi, k_ma, b_mi, b_ma = self._grid_optimizer.last_search_bounds
+        condition_surface = condition.copy()
+        condition_surface.k_min = k_mi
+        condition_surface.k_max = k_ma
+        condition_surface.b_min = b_mi
+        condition_surface.b_max = b_ma
+
+        K, B, Z = self._grid_optimizer.evaluate_surface(
             objective_function=objective,
-            condition=condition,
+            condition=condition_surface,
+            grid_step_k=SURFACE_GRID_STEP_K,
+            grid_step_b=SURFACE_GRID_STEP_B,
+        )
+
+        k_z_lo = max(k_mi, k_opt - SURFACE_ZOOM_K_HALF)
+        k_z_hi = min(k_ma, k_opt + SURFACE_ZOOM_K_HALF)
+        b_z_lo = max(b_mi, b_opt - SURFACE_ZOOM_B_HALF)
+        b_z_hi = min(b_ma, b_opt + SURFACE_ZOOM_B_HALF)
+
+        min_span_k = SURFACE_ZOOM_GRID_STEP_K * 4.0
+        min_span_b = SURFACE_ZOOM_GRID_STEP_B * 4.0
+        if k_z_hi - k_z_lo < min_span_k:
+            mid_k = 0.5 * (k_z_lo + k_z_hi)
+            k_z_lo = max(k_mi, mid_k - min_span_k / 2.0)
+            k_z_hi = min(k_ma, mid_k + min_span_k / 2.0)
+        if b_z_hi - b_z_lo < min_span_b:
+            mid_b = 0.5 * (b_z_lo + b_z_hi)
+            b_z_lo = max(b_mi, mid_b - min_span_b / 2.0)
+            b_z_hi = min(b_ma, mid_b + min_span_b / 2.0)
+
+        condition_zoom = condition_surface.copy()
+        condition_zoom.k_min = k_z_lo
+        condition_zoom.k_max = k_z_hi
+        condition_zoom.b_min = b_z_lo
+        condition_zoom.b_max = b_z_hi
+
+        Kz, Bz, Zz = self._grid_optimizer.evaluate_surface(
+            objective_function=objective,
+            condition=condition_zoom,
+            grid_step_k=SURFACE_ZOOM_GRID_STEP_K,
+            grid_step_b=SURFACE_ZOOM_GRID_STEP_B,
         )
 
         result: CalculationResult = self._build_result(
@@ -163,7 +215,7 @@ class OptimizationService:
             use_mask=use_mask,
         )
 
-        return result, K, B, Z
+        return result, K, B, Z, Kz, Bz, Zz
 
     def _build_objective(
         self,

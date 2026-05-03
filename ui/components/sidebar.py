@@ -57,6 +57,7 @@ class SidebarState:
     reset_search_settings: bool
 
     surface_z_cap_max: Optional[float]
+    surface_view_mode: str
 
 
 def render_sidebar(
@@ -232,6 +233,18 @@ def render_sidebar(
 
     st.sidebar.divider()
     with st.sidebar.expander("3D サーフェス（grid）", expanded=False):
+        _surface_labels: dict[str, str] = {
+            "coarse": "全体（粗）",
+            "zoom": "最小付近（細）",
+        }
+        surface_view_mode: str = st.radio(
+            label="3D表示領域",
+            options=list(_surface_labels.keys()),
+            format_func=lambda k: _surface_labels[k],
+            horizontal=True,
+            key="sidebar_surface_view_mode",
+        )
+
         surface_z_cap_str: str = st.text_input(
             label="MSE 表示上限（空欄＝自動・1e9未満のみで99%分位）",
             key="sidebar_surface_z_cap",
@@ -273,6 +286,7 @@ def render_sidebar(
         execute_optimization=execute_optimization,
         reset_search_settings=reset_search_settings,
         surface_z_cap_max=surface_z_cap_max,
+        surface_view_mode=surface_view_mode,
     )
 
 
@@ -317,6 +331,7 @@ def _initialize_sidebar_state() -> None:
         "sidebar_weight_mode": DEFAULT_WEIGHT_MODE,
         "sidebar_use_normalized_mse": DEFAULT_USE_NORMALIZED_MSE,
         "sidebar_surface_z_cap": "",
+        "sidebar_surface_view_mode": "coarse",
     }
 
     for key, value in defaults.items():

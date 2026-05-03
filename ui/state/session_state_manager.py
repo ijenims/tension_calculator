@@ -19,6 +19,9 @@ LAST_RESULT_KEY = "last_result"
 SURFACE_K_KEY = "surface_K"
 SURFACE_B_KEY = "surface_B"
 SURFACE_Z_KEY = "surface_Z"
+SURFACE_K_ZOOM_KEY = "surface_K_zoom"
+SURFACE_B_ZOOM_KEY = "surface_B_zoom"
+SURFACE_Z_ZOOM_KEY = "surface_Z_zoom"
 
 EDITOR_MEASURED_KEY = "editor_measured"
 EDITOR_USE_MASK_KEY = "editor_use_mask"
@@ -59,6 +62,9 @@ def initialize_session_state() -> None:
         SURFACE_K_KEY: None,
         SURFACE_B_KEY: None,
         SURFACE_Z_KEY: None,
+        SURFACE_K_ZOOM_KEY: None,
+        SURFACE_B_ZOOM_KEY: None,
+        SURFACE_Z_ZOOM_KEY: None,
         EDITOR_MEASURED_KEY: [],
         EDITOR_USE_MASK_KEY: [],
         EDITOR_THEORETICAL_KEY: [],
@@ -306,35 +312,53 @@ def set_surface_data(
     K: Optional[np.ndarray],
     B: Optional[np.ndarray],
     Z: Optional[np.ndarray],
+    K_zoom: Optional[np.ndarray] = None,
+    B_zoom: Optional[np.ndarray] = None,
+    Z_zoom: Optional[np.ndarray] = None,
 ) -> None:
     """
     3Dサーフェス描画用データを保存する。
 
     Args:
         K:
-            k の meshgrid。
+            k の meshgrid（全域・粗）。
         B:
             b の meshgrid。
         Z:
             各格子点の目的関数値。
+        K_zoom, B_zoom, Z_zoom:
+            最小付近（細）の meshgrid。省略時は None。
     """
     st.session_state[SURFACE_K_KEY] = K
     st.session_state[SURFACE_B_KEY] = B
     st.session_state[SURFACE_Z_KEY] = Z
+    st.session_state[SURFACE_K_ZOOM_KEY] = K_zoom
+    st.session_state[SURFACE_B_ZOOM_KEY] = B_zoom
+    st.session_state[SURFACE_Z_ZOOM_KEY] = Z_zoom
 
 
-def get_surface_data() -> tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
+def get_surface_data() -> tuple[
+    Optional[np.ndarray],
+    Optional[np.ndarray],
+    Optional[np.ndarray],
+    Optional[np.ndarray],
+    Optional[np.ndarray],
+    Optional[np.ndarray],
+]:
     """
     3Dサーフェス描画用データを取得する。
 
     Returns:
-        tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
-            (K, B, Z)
+        tuple:
+            (K, B, Z, K_zoom, B_zoom, Z_zoom)
     """
     return (
         st.session_state.get(SURFACE_K_KEY),
         st.session_state.get(SURFACE_B_KEY),
         st.session_state.get(SURFACE_Z_KEY),
+        st.session_state.get(SURFACE_K_ZOOM_KEY),
+        st.session_state.get(SURFACE_B_ZOOM_KEY),
+        st.session_state.get(SURFACE_Z_ZOOM_KEY),
     )
 
 
@@ -345,6 +369,9 @@ def clear_surface_data() -> None:
     st.session_state[SURFACE_K_KEY] = None
     st.session_state[SURFACE_B_KEY] = None
     st.session_state[SURFACE_Z_KEY] = None
+    st.session_state[SURFACE_K_ZOOM_KEY] = None
+    st.session_state[SURFACE_B_ZOOM_KEY] = None
+    st.session_state[SURFACE_Z_ZOOM_KEY] = None
 
 
 def reset_result_state() -> None:

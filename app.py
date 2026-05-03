@@ -193,12 +193,12 @@ def main() -> None:
     elif sidebar_state.execute_optimization:
         try:
             if search_condition.method == "grid":
-                result, K, B, Z = optimization_service.optimize_with_surface(
+                result, K, B, Z, Kz, Bz, Zz = optimization_service.optimize_with_surface(
                     cable=working_cable,
                     use_mask=edited_use_mask,
                     condition=search_condition,
                 )
-                set_surface_data(K=K, B=B, Z=Z)
+                set_surface_data(K=K, B=B, Z=Z, K_zoom=Kz, B_zoom=Bz, Z_zoom=Zz)
             else:
                 result = optimization_service.optimize(
                     cable=working_cable,
@@ -244,7 +244,13 @@ def main() -> None:
         except Exception as exc:
             st.error(f"グラフ描画でエラー: {exc}")
 
-        K, B, Z = get_surface_data()
+        K, B, Z, Kz, Bz, Zz = get_surface_data()
+        if sidebar_state.surface_view_mode == "zoom" and Kz is not None and Bz is not None and Zz is not None:
+            K, B, Z = Kz, Bz, Zz
+            surface_title = "Mean Squared Error（最小付近・細）"
+        else:
+            surface_title = "Mean Squared Error（全体・粗）"
+
         if (
             search_condition.method == "grid"
             and K is not None
@@ -256,7 +262,7 @@ def main() -> None:
                     K=K,
                     B=B,
                     Z=Z,
-                    title="Mean Squared Error",
+                    title=surface_title,
                     show_contours=True,
                     orthographic=True,
                     aspect_ratio=(1.0, 1.0, 1.0),
