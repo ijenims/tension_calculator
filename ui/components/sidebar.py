@@ -190,21 +190,10 @@ def render_sidebar(
             key="sidebar_b_max",
         )
 
-        if method == "grid":
-            col_step_k, col_step_b = st.columns(2)
-            grid_step_k_str: str = col_step_k.text_input(
-                label="grid_step_k",
-                key="sidebar_grid_step_k",
-                disabled=(method != "grid"),
-            )
-            grid_step_b_str: str = col_step_b.text_input(
-                label="grid_step_b",
-                key="sidebar_grid_step_b",
-                disabled=(method != "grid"),
-            )
-        else:
-            grid_step_k_str = st.session_state["sidebar_grid_step_k"]
-            grid_step_b_str = st.session_state["sidebar_grid_step_b"]
+        # grid_step_k / grid_step_b は多段グリッドで使わないため UI 非表示
+        # SearchCondition にはデフォルト値が入る
+        grid_step_k_str = st.session_state["sidebar_grid_step_k"]
+        grid_step_b_str = st.session_state["sidebar_grid_step_b"]
 
         weight_mode: str = st.selectbox(
             label="重み付け",

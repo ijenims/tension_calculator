@@ -193,55 +193,46 @@ python batch_runner_scipy.py    # 2. scipy（後から追加）
 
 - `batch_runner.py` は `SearchCondition.default()` のみ使用（以前の `grid_step_b = 0.01` 上書きは削除）。
 
-## ここから先は最後のチャット原文(要約してない)
-Q. あと、最小値付近を拡大するとやっぱりギザギザになるよな。グラフ表示用のグリッド幅やからしゃあないやろけど、最小値付近だけでも表示グリッドを小さくすることって結構大変？
+## 3D サーフェス 最小付近の拡大表示（2026-05-03）
 
-A. **そこまで大変ではない**（表示だけの話なので、ロジックは素直）。
+### 経緯
 
-## やりたいことのイメージ
+- 全域を粗い格子1枚で Surface しているため、谷が細いとギザつく問題があった
+- 最小付近だけ刻みを細かくする方針を検討
 
-いまは **全域を粗い格子 1 枚**で `Surface` しているので、谷が細いとギザつく。  
-**最小付近だけ刻みを細かくする**のは、だいたい次のどれか。
+### 検討した方針
 
-| 方針 | 実装の重さ | 内容 |
-|------|------------|------|
-| **A. 細い `Surface` をもう 1 枚足す** | 小〜中 | 粗い全域＋`(k_opt,b_opt)` 周りの矩形だけ `evaluate_surface` を細刻み。Plotly で **trace を 2 本**（同じ `Figure`）。拡大パッチが少し盛り上がって見えるのを、透明度や色でごまかす。 |
-| **B. 表示を「拡大ビュー」に切替** | 小 | トグルで「全体（粗）／最小付近（細）」を切り替え。実装は `evaluate_surface` を 2 パターン呼ぶだけ。 |
-| **C. 不規則格子** | 中 | `Mesh3d` など。見た目は柔軟だが、コードとデバッグがやや増える。 |
+| 方針 | 実装の重さ | 内容 | 採否 |
+|------|------------|------|------|
+| A. 細い Surface をもう1枚足す | 小〜中 | 粗い全域＋最適解周りの矩形だけ細刻み。trace 2本。 | 不採用 |
+| B. 表示を「拡大ビュー」に切替 | 小 | トグルで「全体（粗）／最小付近（細）」を切り替え | **採用** |
+| C. 不規則格子 | 中 | Mesh3d。見た目は柔軟だがコードとデバッグが増える | 不採用 |
 
-## 負荷の目安
+### 実装内容（方針 B）
 
-- **`evaluate_surface` は既にある**ので、**細い窓を決めてもう 1 回呼ぶ**だけ。
-- 窓は例: `k_opt ± 0.2`, `b_opt ± 2` を `last_search_bounds` でクリップ、刻みは `grid_multistage.py` に `SURFACE_FINE_STEP_*` を足す程度。
-- **大変なのは仕様決め**（窓の幅・細さ・粗面を残すか／拡大だけにするか）で、**実装は 1〜2 ファイル（`optimization_service` + `app` or プロット）で収まる**ことが多い。
+- `config/grid_multistage.py` に追加:
+  - `SURFACE_ZOOM_K_HALF = 0.25`, `SURFACE_ZOOM_B_HALF = 5.0`
+  - `SURFACE_ZOOM_GRID_STEP_K = 0.01`, `SURFACE_ZOOM_GRID_STEP_B = 0.2`
+- `optimize_with_surface`: 全域・粗の K,B,Z に加え、最適解中心の窓で細い格子の Kz,Bz,Zz を計算して返す（窓が狭すぎるときは最小スパンを確保）
+- `session_state_manager`: `set_surface_data(..., K_zoom=..., B_zoom=..., Z_zoom=...)` / `get_surface_data()` は 6 要素
+- サイドバー「3D サーフェス（grid）」: ラジオ「全体（粗）」／「最小付近（細）」（key=sidebar_surface_view_mode、既定 coarse）
+- `app.py`: モードに応じて K,B,Z を差し替え、タイトルを変更。細データが無い場合は粗にフォールバック
 
-まとめると、「最小付近だけ表示グリッドを細かくする」は **よくある対応で、難易度は中の下**くらい。やるなら **B（切替）か A（二重 Surface）** がおすすめ。
+### 注意事項
 
-対応：内容（方針 B）
-config/grid_multistage.py
+- 「最小付近」は最適化実行時にだけ再計算される
+- ラジオだけ切り替えた場合はキャッシュした粗／細を使い回す
+- 細を見る前に必ず grid で最適化実行が必要
 
-SURFACE_ZOOM_K_HALF = 0.25、SURFACE_ZOOM_B_HALF = 5.0
-SURFACE_ZOOM_GRID_STEP_K = 0.01、SURFACE_ZOOM_GRID_STEP_B = 0.2
-optimize_with_surface
+---
 
-従来どおり全域・粗の K,B,Z に加え、最適解中心の窓で細い格子の Kz,Bz,Zz を計算して返す（窓が狭すぎるときは最小スパンを確保）。
-session_state_manager
+## 未解決・次の検討事項
 
-set_surface_data(..., K_zoom=..., B_zoom=..., Z_zoom=...)
-get_surface_data() は 6 要素 (K,B,Z,Kz,Bz,Zz)。
-サイドバー「3D サーフェス（grid）」
+### UI の grid_step_k / grid_step_b 入力の扱い
 
-ラジオ 「全体（粗）」／「最小付近（細）」（key=sidebar_surface_view_mode、既定 coarse）。
-app.py
-
-表示時にモードに応じて K,B,Z を差し替え、タイトルを
-Mean Squared Error（全体・粗）
-Mean Squared Error（最小付近・細）
-細データが無い（未実行・古いセッションなど）は自動で粗にフォールバック。
-context.md
-
-上記の挙動を追記。
-注意: 「最小付近」は 最適化実行時にだけ再計算される。ラジオだけ切り替えた場合はキャッシュした粗／細を使い回す。細を見る前に必ず grid で最適化実行が必要。
-
-## 次の一手
-Q. そういえばUIのgrid_step_k, grid_step_b入力は意味ないんやったな
+- 多段グリッド探索の導入により、サイドバーの `grid_step_k` / `grid_step_b` は grid 探索本体では使われなくなった
+- 現在は scipy 用および `evaluate_surface` のフォールバック用としてのみ残っている
+- **決定: UI から削除**（2026-05-07）
+  - サイドバーの入力欄を非表示にした
+  - `SearchCondition` のフィールド・デフォルト値はそのまま残す（バッチ・内部ロジック用）
+  - ユーザーが値を変えても grid に影響しない混乱を解消
